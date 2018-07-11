@@ -64,7 +64,6 @@ pub fn check_gir_content(content: &str) -> Errors {
         } else if in_list.is_some() && lines[pos].trim() == "]" {
             if !elems.is_empty() {
                 let mut local_errors = 0;
-                println!("{:?}", elems);
                 for it in 0..elems.len() - 1 {
                     if elems[it] > elems[it + 1] {
                         messages.push(format!("ERROR: \"{}\" should be after \"{}\"",
