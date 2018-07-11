@@ -1,0 +1,14 @@
+[package]
+name = "gir-format-check"
+license = "MIT"
+homepage = "https://github.com/gtk-rs/gir-format-check"
+authors = ["The Gtk-rs Project Developers"]
+keywords = ["gtk-rs", "gir", "check"]
+readme = "README.md"
+documentation = "https://docs.rs/crate/gir-format-check/"
+version = "0.1.0"
+description = "File format checker"
+repository = "https://github.com/gtk-rs/gir-format-check"
+
+[lib]
+name = "gir_format_check"
