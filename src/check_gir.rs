@@ -6,6 +6,7 @@ use utils;
 use errors::Errors;
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -64,6 +65,22 @@ pub fn check_gir_content(content: &str) -> Errors {
         } else if in_list.is_some() && lines[pos].trim() == "]" {
             if !elems.is_empty() {
                 let mut local_errors = 0;
+                let mut comments_map: HashMap<&str, Vec<&str>> = HashMap::new();
+                let mut i = 0;
+                while i < elems.len() {
+                    if !elems[i].name.trim_start().starts_with("#") {
+                        i += 1;
+                        continue;
+                    }
+                    let mut comments = vec![lines[elems.remove(i).pos]];
+                    while i < elems.len() && elems[i].name.trim_start().starts_with("#") {
+                        comments.push(lines[elems.remove(i).pos]);
+                    }
+                    if i < elems.len() {
+                        comments_map.insert(lines[elems[i].pos], comments);
+                    }
+                    i += 1;
+                }
                 for it in 0..elems.len() - 1 {
                     if elems[it] > elems[it + 1] {
                         messages.push(format!("ERROR: \"{}\" should be after \"{}\"",
@@ -77,7 +94,13 @@ pub fn check_gir_content(content: &str) -> Errors {
                     messages.push(format!("\n== Expected output ==\n{}\n{}]",
                                           lines[in_list.unwrap()],
                                           elems.iter()
-                                               .map(|l| format!("{}\n", lines[l.pos]))
+                                               .map(|l| {
+                                                    if let Some(comments) = comments_map.get(&lines[l.pos]) {
+                                                        format!("{}\n{}\n", comments.join("\n"), lines[l.pos])
+                                                    } else {
+                                                        format!("{}\n", lines[l.pos])
+                                                    }
+                                                })
                                                .collect::<String>()));
                     errors += local_errors;
                 }
