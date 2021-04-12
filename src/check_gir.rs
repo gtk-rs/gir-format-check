@@ -41,7 +41,7 @@ impl<'a> PartialOrd for Elem<'a> {
 
 impl<'a> Ord for Elem<'a> {
     fn cmp(&self, other: &Elem) -> Ordering {
-        if self.lower.ends_with("*") {
+        if self.lower.ends_with('*') {
             // We always it to be first "because"!
             Ordering::Less
         } else {
@@ -60,7 +60,7 @@ pub fn check_gir_content(content: &str) -> Errors {
     let mut messages = Vec::with_capacity(10);
 
     for pos in 0..lines.len() {
-        if lines[pos].ends_with("[") {
+        if lines[pos].ends_with('[') {
             in_list = Some(pos);
             continue;
         } else if in_list.is_some() && lines[pos].trim() == "]" {
@@ -69,12 +69,12 @@ pub fn check_gir_content(content: &str) -> Errors {
                 let mut comments_map: HashMap<&str, Vec<&str>> = HashMap::new();
                 let mut i = 0;
                 while i < elems.len() {
-                    if !elems[i].name.trim_start().starts_with("#") {
+                    if !elems[i].name.trim_start().starts_with('#') {
                         i += 1;
                         continue;
                     }
                     let mut comments = vec![lines[elems.remove(i).pos]];
-                    while i < elems.len() && elems[i].name.trim_start().starts_with("#") {
+                    while i < elems.len() && elems[i].name.trim_start().starts_with('#') {
                         comments.push(lines[elems.remove(i).pos]);
                     }
                     if i < elems.len() {
@@ -118,16 +118,14 @@ pub fn check_gir_content(content: &str) -> Errors {
             let mut len = trimmed.len();
             if trimmed.ends_with("\",") {
                 len -= 2;
-            } else if trimmed.ends_with(",") {
-                len -= 1;
-            } else if trimmed.ends_with("\"") {
+            } else if trimmed.ends_with(',') || trimmed.ends_with('"') {
                 len -= 1;
             }
-            let start = if trimmed.starts_with("\"") { 1 } else { 0 };
+            let start = if trimmed.starts_with('"') { 1 } else { 0 };
             elems.push(Elem::new(&trimmed[start..len], pos));
         } else if lines[pos] == "[[object]]" {
             in_object = true;
-        } else if in_object == true && lines[pos].starts_with("name = \"") {
+        } else if in_object && lines[pos].starts_with("name = \"") {
             let trimmed = lines[pos].trim();
             let len = trimmed.len() - 1;
             objects.push(Elem::new(&lines[pos].trim()[8..len], pos));
