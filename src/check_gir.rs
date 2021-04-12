@@ -2,10 +2,11 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under the MIT license, see the LICENSE file or <http://opensource.org/licenses/MIT>
 
-use utils;
 use errors::Errors;
+use utils;
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -40,7 +41,8 @@ impl<'a> PartialOrd for Elem<'a> {
 
 impl<'a> Ord for Elem<'a> {
     fn cmp(&self, other: &Elem) -> Ordering {
-        if self.lower.ends_with("*") { // We always it to be first "because"!
+        if self.lower.ends_with('*') {
+            // We always it to be first "because"!
             Ordering::Less
         } else {
             self.lower.cmp(&other.lower)
@@ -58,27 +60,54 @@ pub fn check_gir_content(content: &str) -> Errors {
     let mut messages = Vec::with_capacity(10);
 
     for pos in 0..lines.len() {
-        if lines[pos].ends_with("[") {
+        if lines[pos].ends_with('[') {
             in_list = Some(pos);
-            continue
+            continue;
         } else if in_list.is_some() && lines[pos].trim() == "]" {
             if !elems.is_empty() {
                 let mut local_errors = 0;
+                let mut comments_map: HashMap<&str, Vec<&str>> = HashMap::new();
+                let mut i = 0;
+                while i < elems.len() {
+                    if !elems[i].name.trim_start().starts_with('#') {
+                        i += 1;
+                        continue;
+                    }
+                    let mut comments = vec![lines[elems.remove(i).pos]];
+                    while i < elems.len() && elems[i].name.trim_start().starts_with('#') {
+                        comments.push(lines[elems.remove(i).pos]);
+                    }
+                    if i < elems.len() {
+                        comments_map.insert(lines[elems[i].pos], comments);
+                    }
+                    i += 1;
+                }
                 for it in 0..elems.len() - 1 {
                     if elems[it] > elems[it + 1] {
-                        messages.push(format!("ERROR: \"{}\" should be after \"{}\"",
-                                              elems[it].name,
-                                              elems[it + 1].name));
+                        messages.push(format!(
+                            "ERROR: \"{}\" should be after \"{}\"",
+                            elems[it].name,
+                            elems[it + 1].name
+                        ));
                         local_errors += 1;
                     }
                 }
                 if local_errors > 0 {
                     elems.sort();
-                    messages.push(format!("\n== Expected output ==\n{}\n{}]",
-                                          lines[in_list.unwrap()],
-                                          elems.iter()
-                                               .map(|l| format!("{}\n", lines[l.pos]))
-                                               .collect::<String>()));
+                    messages.push(format!(
+                        "\n== Expected output ==\n{}\n{}]",
+                        lines[in_list.unwrap()],
+                        elems
+                            .iter()
+                            .map(|l| {
+                                if let Some(comments) = comments_map.get(&lines[l.pos]) {
+                                    format!("{}\n{}\n", comments.join("\n"), lines[l.pos])
+                                } else {
+                                    format!("{}\n", lines[l.pos])
+                                }
+                            })
+                            .collect::<String>()
+                    ));
                     errors += local_errors;
                 }
             }
@@ -89,16 +118,14 @@ pub fn check_gir_content(content: &str) -> Errors {
             let mut len = trimmed.len();
             if trimmed.ends_with("\",") {
                 len -= 2;
-            } else if trimmed.ends_with(",") {
+            } else if trimmed.ends_with(',') || trimmed.ends_with('"') {
                 len -= 1;
-            } else if trimmed.ends_with("\"") {
-               len -= 1;
             }
-            let start = if trimmed.starts_with("\"") { 1 } else { 0 };
+            let start = if trimmed.starts_with('"') { 1 } else { 0 };
             elems.push(Elem::new(&trimmed[start..len], pos));
         } else if lines[pos] == "[[object]]" {
             in_object = true;
-        } else if in_object == true && lines[pos].starts_with("name = \"") {
+        } else if in_object && lines[pos].starts_with("name = \"") {
             let trimmed = lines[pos].trim();
             let len = trimmed.len() - 1;
             objects.push(Elem::new(&lines[pos].trim()[8..len], pos));
@@ -111,18 +138,23 @@ pub fn check_gir_content(content: &str) -> Errors {
         let mut local_errors = 0;
         for it in 0..objects.len() - 1 {
             if objects[it] > objects[it + 1] {
-                messages.push(format!("ERROR: \"{}\" should be after \"{}\"",
-                                      objects[it].name,
-                                      objects[it + 1].name));
+                messages.push(format!(
+                    "ERROR: \"{}\" should be after \"{}\"",
+                    objects[it].name,
+                    objects[it + 1].name
+                ));
                 local_errors += 1;
             }
         }
         if local_errors > 0 {
             objects.sort();
-            messages.push(format!("\n== Expected order ==\n{}",
-                                  objects.iter()
-                                         .map(|l| format!("{}\n", l.name))
-                                         .collect::<String>()));
+            messages.push(format!(
+                "\n== Expected order ==\n{}",
+                objects
+                    .iter()
+                    .map(|l| format!("{}\n", l.name))
+                    .collect::<String>()
+            ));
             errors += local_errors;
         }
     }
