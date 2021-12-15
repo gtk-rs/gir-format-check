@@ -6,7 +6,7 @@ authors = ["The Gtk-rs Project Developers"]
 keywords = ["gtk-rs", "gir", "check"]
 readme = "README.md"
 documentation = "https://docs.rs/crate/gir-format-check/"
-version = "0.1.2"
+version = "0.1.3"
 description = "File format checker"
 repository = "https://github.com/gtk-rs/gir-format-check"
 
