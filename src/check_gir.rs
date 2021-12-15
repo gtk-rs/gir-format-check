@@ -6,23 +6,27 @@ use errors::Errors;
 use utils;
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug)]
 struct Elem<'a> {
     name: &'a str,
+    /// `name` in lowercase.
     lower: String,
     pos: usize,
+    associated_comments: Vec<String>,
 }
 
 impl<'a> Elem<'a> {
-    fn new(name: &str, pos: usize) -> Elem {
-        Elem {
+    fn new(name: &'a str, pos: usize, associated_comments: &mut Vec<String>) -> Elem<'a> {
+        let ret = Elem {
             name,
             lower: name.to_lowercase(),
             pos,
-        }
+            associated_comments: associated_comments.clone(),
+        };
+        associated_comments.clear();
+        ret
     }
 }
 
@@ -58,30 +62,16 @@ pub fn check_gir_content(content: &str) -> Errors {
     let mut in_object = false;
     let mut errors = 0;
     let mut messages = Vec::with_capacity(10);
+    let mut associated_comments = Vec::new();
 
     for pos in 0..lines.len() {
         if lines[pos].ends_with('[') {
+            associated_comments.clear();
             in_list = Some(pos);
             continue;
         } else if in_list.is_some() && lines[pos].trim() == "]" {
             if !elems.is_empty() {
                 let mut local_errors = 0;
-                let mut comments_map: HashMap<&str, Vec<&str>> = HashMap::new();
-                let mut i = 0;
-                while i < elems.len() {
-                    if !elems[i].name.trim_start().starts_with('#') {
-                        i += 1;
-                        continue;
-                    }
-                    let mut comments = vec![lines[elems.remove(i).pos]];
-                    while i < elems.len() && elems[i].name.trim_start().starts_with('#') {
-                        comments.push(lines[elems.remove(i).pos]);
-                    }
-                    if i < elems.len() {
-                        comments_map.insert(lines[elems[i].pos], comments);
-                    }
-                    i += 1;
-                }
                 for it in 0..elems.len() - 1 {
                     if elems[it] > elems[it + 1] {
                         messages.push(format!(
@@ -100,10 +90,14 @@ pub fn check_gir_content(content: &str) -> Errors {
                         elems
                             .iter()
                             .map(|l| {
-                                if let Some(comments) = comments_map.get(&lines[l.pos]) {
-                                    format!("{}\n{}\n", comments.join("\n"), lines[l.pos])
-                                } else {
+                                if l.associated_comments.is_empty() {
                                     format!("{}\n", lines[l.pos])
+                                } else {
+                                    format!(
+                                        "{}\n{}\n",
+                                        l.associated_comments.join("\n"),
+                                        lines[l.pos]
+                                    )
                                 }
                             })
                             .collect::<String>()
@@ -122,13 +116,22 @@ pub fn check_gir_content(content: &str) -> Errors {
                 len -= 1;
             }
             let start = if trimmed.starts_with('"') { 1 } else { 0 };
-            elems.push(Elem::new(&trimmed[start..len], pos));
+            let trimmed = &trimmed[start..len];
+            if trimmed.starts_with('#') {
+                associated_comments.push(lines[pos].to_string());
+            } else {
+                elems.push(Elem::new(trimmed, pos, &mut associated_comments));
+            }
         } else if lines[pos] == "[[object]]" {
             in_object = true;
         } else if in_object && lines[pos].starts_with("name = \"") {
             let trimmed = lines[pos].trim();
             let len = trimmed.len() - 1;
-            objects.push(Elem::new(&lines[pos].trim()[8..len], pos));
+            objects.push(Elem::new(
+                &lines[pos].trim()[8..len],
+                pos,
+                &mut associated_comments,
+            ));
         } else if lines[pos].trim().is_empty() {
             in_object = false;
         }
