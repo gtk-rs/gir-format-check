@@ -116,3 +116,32 @@ something = [
 ]"#
     );
 }
+
+#[test]
+fn check_order_with_comments3() {
+    let content = r#"something = [
+    #just a comment
+    # on multiple lines
+    "test3",
+    # another comment!
+    "test1",
+    "test2",
+]"#;
+
+    let errors = check_gir_content(content);
+    assert_eq!(errors.nb_errors, 1);
+    assert_eq!(
+        errors.to_string(),
+        r#"ERROR: "test3" should be after "test1"
+
+== Expected output ==
+something = [
+    # another comment!
+    "test1",
+    "test2",
+    #just a comment
+    # on multiple lines
+    "test3",
+]"#
+    );
+}
